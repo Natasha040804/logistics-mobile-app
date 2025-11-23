@@ -32,7 +32,7 @@
       "expo-router"
     ],
     "extra": {
-      "EXPO_PUBLIC_API_BASE": "http://16.176.194.83:5000/api",
+      "EXPO_PUBLIC_API_BASE": "http://16.176.194.83/api",
       "router": {},
       "eas": {
         "projectId": "d445abce-59b0-4465-b483-d679a6aca96d"
