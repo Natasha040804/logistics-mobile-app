@@ -2,7 +2,7 @@ import 'react-native-gesture-handler';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { api, initializeApp } from '../lib/api';
+import { api, initializeApp, setApiBaseUrl, getApiDiagnostics } from '../lib/api';
 import LocationPermissionService from '../services/LocationPermissionService';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -15,11 +15,17 @@ export default function Login() {
 
   const [loading, setLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('checking'); // checking | connected | failed
+  const [apiBase, setApiBase] = useState('');
+  const [showDebug, setShowDebug] = useState(false);
+  const [overrideInput, setOverrideInput] = useState('');
 
   useEffect(() => {
     (async () => {
       const connected = await initializeApp();
       setConnectionStatus(connected ? 'connected' : 'failed');
+      const diag = getApiDiagnostics();
+      setApiBase(diag.API_BASE_URL);
+      setOverrideInput(diag.API_BASE_URL);
     })();
   }, []);
 
@@ -81,6 +87,21 @@ export default function Login() {
     }
   };
 
+  const connectionMessage = connectionStatus === 'checking'
+    ? 'Checking connection...'
+    : connectionStatus === 'connected'
+    ? '\u2705 Connected to server'
+    : connectionStatus === 'failed'
+    ? '\u274C Cannot connect to server'
+    : '';
+
+  const applyOverride = () => {
+    if (!overrideInput.trim()) return;
+    const updated = setApiBaseUrl(overrideInput.trim());
+    setApiBase(updated);
+    Alert.alert('API Base Updated', updated);
+  };
+
   return (
     <View style={styles.background}>
       <View style={styles.overlay}>
@@ -96,11 +117,27 @@ export default function Login() {
           connectionStatus === 'connected' && styles.connected,
           connectionStatus === 'failed' && styles.failed
         ]}>
-          <Text style={styles.connectionText}>
-            {connectionStatus === 'checking' && 'Checking connection...'}
-            {connectionStatus === 'connected' && '✅ Connected to server'}
-            {connectionStatus === 'failed' && '❌ Cannot connect to server'}
-          </Text>
+          <Text style={styles.connectionText}>{connectionMessage}</Text>
+          <TouchableOpacity onLongPress={() => setShowDebug(s => !s)}>
+            <Text style={styles.debugToggle}>↕ Debug {showDebug ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          {showDebug && (
+            <View style={styles.debugBox}>
+              <Text style={styles.debugLabel}>API Base:</Text>
+              <Text style={styles.debugValue}>{apiBase}</Text>
+              <TextInput
+                style={styles.debugInput}
+                value={overrideInput}
+                onChangeText={setOverrideInput}
+                placeholder="http://host:port/api"
+                placeholderTextColor="#ccc"
+                autoCapitalize="none"
+              />
+              <TouchableOpacity style={styles.debugButton} onPress={applyOverride}>
+                <Text style={styles.debugButtonText}>Apply Override</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         <TextInput
@@ -202,4 +239,52 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  debugToggle: {
+    marginTop: 4,
+    color: '#FFD700',
+    fontSize: 12,
+  },
+  debugBox: {
+    marginTop: 8,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.35)'
+  },
+  debugLabel: {
+    color: '#FFD700',
+    fontSize: 12,
+    marginBottom: 4,
+    fontWeight: '600'
+  },
+  debugValue: {
+    color: '#fff',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  debugInput: {
+    width: '100%',
+    height: 40,
+    borderColor: '#fff',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    color: '#fff',
+    fontSize: 12,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.15)'
+  },
+  debugButton: {
+    backgroundColor: '#8A2BE2',
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignItems: 'center'
+  },
+  debugButtonText: {
+    color: '#FFD700',
+    fontSize: 13,
+    fontWeight: '600'
+  }
 });
