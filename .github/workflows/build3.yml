@@ -1,0 +1,72 @@
+name: Build Android APK
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    env:
+      NODE_ENV: production
+      EXPO_PUBLIC_API_URL: http://16.176.194.83
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: '**/package-lock.json'
+        
+    - name: Install dependencies
+      run: npm ci
+        
+    - name: Clean previous builds
+      run: |
+        rm -rf android/build
+        rm -rf android/app/build
+        
+    - name: Prebuild and Build APK
+      run: |
+        npx expo prebuild --clean
+        cd android
+        chmod +x gradlew
+        ./gradlew clean
+        ./gradlew assembleRelease --no-daemon --stacktrace
+        
+    - name: Verify APK
+      run: |
+        APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+        if [ ! -f "$APK_PATH" ]; then
+          echo "❌ APK not found at $APK_PATH"
+          ls -la android/app/build/outputs/apk/release/
+          exit 1
+        fi
+        
+        APK_SIZE=$(stat -f%z "$APK_PATH")
+        echo "APK size: $((APK_SIZE/1024/1024)) MB"
+        
+        if [ "$APK_SIZE" -lt 5000000 ]; then
+          echo "❌ APK seems too small, might be incomplete"
+          exit 1
+        fi
+        
+        echo "✅ APK verification passed"
+        
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: logistics-app
+        path: android/app/build/outputs/apk/release/app-release.apk
+        retention-days: 30
